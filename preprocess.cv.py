@@ -68,8 +68,8 @@ blob_service = BlobService()
 blob_service.create_container(blob_container)
 
 # Get queue credentials
-accountName = environ["AZURE_STORAGE_ACCOUNT_NAME"]
-accountKey = environ["AZURE_STORAGE_ACCOUNT_KEY"]
+accountName = environ["AZURE_STORAGE_ACCOUNT"]
+accountKey = environ["AZURE_STORAGE_ACCESS_KEY"]
 
 # Open queue with given credentials
 queue_service = QueueService( account_name=accountName, account_key=accountKey )
