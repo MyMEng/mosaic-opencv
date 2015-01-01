@@ -1,4 +1,3 @@
-CloudCV
-=======
-
-An example of using OpenCV library in server environment using Node.js
+Mosaic analyser
+===============
+Set of Python scripts to analyze images and create mosaic using OpenCV
