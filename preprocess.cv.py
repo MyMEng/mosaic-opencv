@@ -86,10 +86,13 @@ table_service = TableService( account_name=accountName, account_key=accountKey )
 # get images form *imagesQueue* - it is invoked by CRON
 messages = queue_service.get_messages( imagesQueue )
 for message in messages:
+  print( message.message_text )
   # get image: image ID
   imgBlobName = b64decode( message.message_text )
   tableRowKey = imgBlobName
   blob = blob_service.get_blob(blob_container, imgBlobName)
+  print( "imgBlobName: " + str(imgBlobName) )
+  print( "Blob: " + str(blob) )
   image = blobToOpenCV(blob) # image = getImgURL( imgURL )
   # process image
   image_tn = makeThumbnail( image, imageWidth )
