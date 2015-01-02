@@ -7,7 +7,7 @@ from azure.storage import BlobService
 from azure.storage import TableService
 
 import urllib
-import os import environ
+from os import environ
 from base64 import b64decode
 import itertools
 
