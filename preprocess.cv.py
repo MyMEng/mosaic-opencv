@@ -4,6 +4,7 @@ import cv
 
 from azure.storage import QueueService
 from azure.storage import BlobService
+from azure.storage import TableService
 
 import urllib
 import os import environ
@@ -25,6 +26,7 @@ def getImgURL( imgURL ):
 # Make thumbnails of uploaded images
 def makeThumbnail( image, width ) :
   ## TODO: should I ask whether to do different sizes
+  ## TODO: check whether correct aspect ratio
 
   # we need to keep in mind aspect ratio
   r = (width * 1.0) / image.shape[1]
@@ -63,9 +65,13 @@ blob_container = 'imagecontainer'
 imagesQueue = 'imagesqueue'
 imageWidth = 100
 
+tableName = 'photos'
+tablePartitionKey = 'allPhotos'
+
+
 # Create blob service
 blob_service = BlobService()
-blob_service.create_container(blob_container)
+blob_service.create_container( blob_container )
 
 # Get queue credentials
 accountName = environ["AZURE_STORAGE_ACCOUNT"]
@@ -74,19 +80,32 @@ accountKey = environ["AZURE_STORAGE_ACCESS_KEY"]
 # Open queue with given credentials
 queue_service = QueueService( account_name=accountName, account_key=accountKey )
 
+# Open table service
+table_service = TableService( account_name=accountName, account_key=accountKey )
+
 # get images form *imagesQueue* - it is invoked by CRON
 messages = queue_service.get_messages( imagesQueue )
 for message in messages:
-  # get image
-  imgBlobName = b64decode(message.message_text)
+  # get image: image ID
+  imgBlobName = b64decode( message.message_text )
+  tableRowKey = imgBlobName
   blob = blob_service.get_blob(blob_container, imgBlobName)
   image = blobToOpenCV(blob) # image = getImgURL( imgURL )
   # process image
   image_tn = makeThumbnail( image, imageWidth )
   (hw, sw, vw) = getCharacteristics( image )
 
-  # send the quantities to table
+  # put thumbnail to bloob: add suffix _tn
+  tnID = imgBlobName + "_tn"
+  blob_service.put_block_blob_from_bytes( blob_container, tnID, image_tn )
 
+  # {'PartitionKey': 'allPhotos', 'RowKey': 'imageName', 'thumbnail' : 'thumbnailName',
+  #  'userId' : ?, 'local' : ?, 'hue' : 200, 'saturation' : 200, 'value' : 200}
+  ## query for image in table to ensure existence ## currentTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
+
+  ## send the quantities to table: save thumbnail ID & save image characteristics
+  taskUpdate = { 'thumbnail' : tnID, 'hue' : hw, 'saturation' : sw, 'value' : vw }
+  table_service.update_entity( tableName, tablePartitionKey, tableRowKey, taskUpdate )
 
   # dequeue image
   queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
