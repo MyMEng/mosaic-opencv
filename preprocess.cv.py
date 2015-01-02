@@ -57,15 +57,14 @@ def getCharacteristics( image ):
   counts = np.bincount(vs)
   vw = np.argmax(counts)
 
-  return (hw, sw, vw)
-
+  return (int(hw), int(sw), int(vw))
 
 blob_container = 'imagecontainer'
 imagesQueue = 'imagesqueue'
 imageWidth = 100
 
 tableName = 'photos'
-tablePartitionKey = 'allPhotos'
+tablePartitionKey = 'allphotos'
 
 
 # Create blob service
@@ -87,6 +86,7 @@ messages = queue_service.get_messages( imagesQueue )
 for message in messages:
   # get image: image ID
   imgBlobName = b64decode( message.message_text )
+  print( imgBlobName )
   tableRowKey = imgBlobName
   blob = blob_service.get_blob(blob_container, imgBlobName)
   image = blobToOpenCV(blob) # image = getImgURL( imgURL )
@@ -95,7 +95,8 @@ for message in messages:
   (hw, sw, vw) = getCharacteristics( image )
 
   # put thumbnail to bloob: add suffix _tn
-  ( ,blob_tn) = cv2.imencode( '.jpg', image_tn )
+  result ,blob_tn = cv2.imencode( '.jpg', image_tn )
+
 
   if imgBlobName[-4] == '.'  :
     tnID = imgBlobName[:-4] + "_tn" + imgBlobName[-4:]
@@ -103,15 +104,20 @@ for message in messages:
     tnID = imgBlobName[:-5] + "_tn" + imgBlobName[-5:]
 
 
-  blob_service.put_block_blob_from_bytes( blob_container, tnID, blob_tn )
+  blob_service.put_block_blob_from_bytes( blob_container, tnID, str(bytearray(blob_tn.flatten().tolist())) )
 
   # {'PartitionKey': 'allPhotos', 'RowKey': 'imageName', 'thumbnail' : 'thumbnailName',
   #  'userId' : ?, 'local' : ?, 'hue' : 200, 'saturation' : 200, 'value' : 200}
-  ## query for image in table to ensure existence ## currentTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
+  ## query for image in table to ensure existence
+  currentTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
+  
 
   ## send the quantities to table: save thumbnail ID & save image characteristics
-  taskUpdate = { 'thumbnail' : tnID, 'hue' : hw, 'saturation' : sw, 'value' : vw }
-  table_service.update_entity( tableName, tablePartitionKey, tableRowKey, taskUpdate )
+  currentTask.thumbnail = tnID
+  currentTask.hue = hw
+  currentTask.saturation = sw
+  currentTask.value = vw
+  table_service.update_entity( tableName, tablePartitionKey, tableRowKey, currentTask)
 
   # dequeue image
   queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
