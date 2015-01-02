@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-import cv
 
 from azure.storage import QueueService
 from azure.storage import BlobService
@@ -13,7 +12,9 @@ import itertools
 
 def blobToOpenCV(blob):
     arr = np.asarray(bytearray(blob), dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.CV_LOAD_IMAGE_COLOR)
+    print (arr)
+    img = cv2.imdecode(arr, -1)
+    print img
     return img
 
 # read image from URL to CV format
@@ -40,7 +41,7 @@ def makeThumbnail( image, width ) :
 def getCharacteristics( image ):
   # range_hist = [0, 100, -100, 100, -100, 100]
   # hist_1 = cv2.calcHist([image], [0, 1, 2], None, [20, 20, 20], range_hist)
-  hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+  hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
   h = hsv[:,:,0]
   s = hsv[:,:,1]
   v = hsv[:,:,2]
@@ -86,13 +87,13 @@ table_service = TableService( account_name=accountName, account_key=accountKey )
 # get images form *imagesQueue* - it is invoked by CRON
 messages = queue_service.get_messages( imagesQueue )
 for message in messages:
-  print( message.message_text )
+  #print( message.message_text )
   # get image: image ID
   imgBlobName = b64decode( message.message_text )
   tableRowKey = imgBlobName
   blob = blob_service.get_blob(blob_container, imgBlobName)
-  print( "imgBlobName: " + str(imgBlobName) )
-  print( "Blob: " + str(blob) )
+  #print( "imgBlobName: " + str(imgBlobName) )
+  #print( "Blob: " + str(blob) )
   image = blobToOpenCV(blob) # image = getImgURL( imgURL )
   # process image
   image_tn = makeThumbnail( image, imageWidth )
