@@ -12,9 +12,7 @@ import itertools
 
 def blobToOpenCV(blob):
     arr = np.asarray(bytearray(blob), dtype=np.uint8)
-    print (arr)
     img = cv2.imdecode(arr, -1)
-    print img
     return img
 
 # read image from URL to CV format
@@ -87,21 +85,25 @@ table_service = TableService( account_name=accountName, account_key=accountKey )
 # get images form *imagesQueue* - it is invoked by CRON
 messages = queue_service.get_messages( imagesQueue )
 for message in messages:
-  #print( message.message_text )
   # get image: image ID
   imgBlobName = b64decode( message.message_text )
   tableRowKey = imgBlobName
   blob = blob_service.get_blob(blob_container, imgBlobName)
-  #print( "imgBlobName: " + str(imgBlobName) )
-  #print( "Blob: " + str(blob) )
   image = blobToOpenCV(blob) # image = getImgURL( imgURL )
   # process image
   image_tn = makeThumbnail( image, imageWidth )
   (hw, sw, vw) = getCharacteristics( image )
 
   # put thumbnail to bloob: add suffix _tn
-  tnID = imgBlobName + "_tn"
-  blob_service.put_block_blob_from_bytes( blob_container, tnID, image_tn )
+  ( ,blob_tn) = cv2.imencode( '.jpg', image_tn )
+
+  if imgBlobName[-4] == '.'  :
+    tnID = imgBlobName[:-4] + "_tn" + imgBlobName[-4:]
+  else :
+    tnID = imgBlobName[:-5] + "_tn" + imgBlobName[-5:]
+
+
+  blob_service.put_block_blob_from_bytes( blob_container, tnID, blob_tn )
 
   # {'PartitionKey': 'allPhotos', 'RowKey': 'imageName', 'thumbnail' : 'thumbnailName',
   #  'userId' : ?, 'local' : ?, 'hue' : 200, 'saturation' : 200, 'value' : 200}
