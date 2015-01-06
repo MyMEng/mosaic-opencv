@@ -101,12 +101,21 @@ while(True):
 
   # get images form *imagesQueue* - it is invoked by CRON
   messages = queue_service.get_messages( imagesQueue )
+  if len(messages) == 0:
+    sleep(15)
   for message in messages:
     # get image: image ID
     imgBlobName = b64decode( message.message_text )
     print( imgBlobName )
     tableRowKey = imgBlobName
-    blob = blob_service.get_blob(blob_container, imgBlobName)
+
+    try:
+      blob = blob_service.get_blob(blob_container, imgBlobName)
+    except azure.WindowsAzureMissingResourceError:
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      continue
+
+
     image = blobToOpenCV(blob) # image = getImgURL( imgURL )
     # process image
     image_tn = makeThumbnail( image, imageWidth )
@@ -140,5 +149,3 @@ while(True):
 
     # dequeue image
     queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
-    sleep(15)
-
