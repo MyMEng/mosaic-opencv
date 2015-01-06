@@ -11,7 +11,7 @@ from base64 import b64decode
 import itertools
 from time import sleep
 from math import ceil, floor
-from picke import load
+from pickle import load
 
 def blobToOpenCV(blob):
     arr = np.asarray(bytearray(blob), dtype=np.uint8)
@@ -66,8 +66,8 @@ while(True):
 
     # Check if analysis completed: if not continue to next message
     currentTableTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
-    if hasattr(currentTask, 'analysed'):
-      if currentTask.analysed:
+    if hasattr(currentTableTask, 'analysed'):
+      if currentTableTask.analysed:
         # Do nothing analysis completed
         pass
       else:
@@ -101,7 +101,6 @@ while(True):
     # Get analysed data from blob
     # Start putting together minis
     print "Mosaic making"
-    continue
 
     # dequeue image
     queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )

@@ -10,7 +10,7 @@ from base64 import b64decode
 import itertools
 from time import sleep
 from math import ceil, floor
-from picke import dump
+from pickle import dumps
 
 def blobToOpenCV(blob):
     arr = np.asarray(bytearray(blob), dtype=np.uint8)
@@ -48,19 +48,19 @@ def getCharacteristics( image, region, resultsHolder ):
   resultsHolder = np.zeros([3, img.shape[0], img.shape[1]])
 
   # Analyse quadrants
-  for heigh in np.range(0, img.shape[0], region):
-    for width in np.range(0, img.shape[1], region):
+  for heigh in np.arange(0, img.shape[0], region):
+    for width in np.arange(0, img.shape[1], region):
 
-      h = hsv[heigh:heigh+region-1, width:width+region-1, 0]
-      s = hsv[heigh:heigh+region-1, width:width+region-1, 1]
-      v = hsv[heigh:heigh+region-1, width:width+region-1, 2]
+      h = img[heigh:heigh+region-1, width:width+region-1, 0]
+      s = img[heigh:heigh+region-1, width:width+region-1, 1]
+      v = img[heigh:heigh+region-1, width:width+region-1, 2]
 
       hs = list(itertools.chain.from_iterable(h.tolist()))
       ss = list(itertools.chain.from_iterable(s.tolist()))
       vs = list(itertools.chain.from_iterable(v.tolist()))
 
       counts = np.bincount(hs)
-      hresultsHolder[0, heigh/2, width/2] = np.argmax(counts)
+      resultsHolder[0, heigh/2, width/2] = np.argmax(counts)
 
       counts = np.bincount(ss)
       resultsHolder[1, heigh/2, width/2] = np.argmax(counts)
@@ -125,7 +125,7 @@ while(True):
     # process image
     colourStructure = getCharacteristics( image, region, results )
 
-    put_block_blob_form_bytes( blob_analysis, imgBlobName, dump(colourStructure) )
+    blob_service.put_block_blob_from_bytes( blob_analysis, imgBlobName, dumps(colourStructure) )
 
     # {'PartitionKey': 'allPhotos', 'RowKey': 'imageName', 'thumbnail' : 'thumbnailName',
     #  'userId' : ?, 'local' : ?, 'hue' : 200, 'saturation' : 200, 'value' : 200}
