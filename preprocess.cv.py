@@ -4,6 +4,7 @@ import cv2
 from azure.storage import QueueService
 from azure.storage import BlobService
 from azure.storage import TableService
+import azure
 
 import urllib
 # from os import environ
