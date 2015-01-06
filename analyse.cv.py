@@ -9,6 +9,8 @@ from azure.storage import TableService
 from base64 import b64decode
 import itertools
 from time import sleep
+from math import ceil, floor
+from picke import dump
 
 def blobToOpenCV(blob):
     arr = np.asarray(bytearray(blob), dtype=np.uint8)
@@ -16,31 +18,61 @@ def blobToOpenCV(blob):
     return img
 
 # Analyse the overall colour of image
-def getCharacteristics( image ):
-  # range_hist = [0, 100, -100, 100, -100, 100]
-  # hist_1 = cv2.calcHist([image], [0, 1, 2], None, [20, 20, 20], range_hist)
-  hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-  h = hsv[:,:,0]
-  s = hsv[:,:,1]
-  v = hsv[:,:,2]
+def getCharacteristics( image, region, resultsHolder ):
+  # Check whether region divides image and if not fill
+  imgH = image.shape[0]
+  imgW = image.shape[1]
 
-  hs = list(itertools.chain.from_iterable(h.tolist()))
-  ss = list(itertools.chain.from_iterable(s.tolist()))
-  vs = list(itertools.chain.from_iterable(v.tolist()))
+  # Crop the border
+  ndH = imgH % region
+  ndW = imgW % region
+  # if able to do it both-sided
+  if ndH % 2 == 0:
+    cut = ndH /2
+    img = image[cut:imgH-cut, :]
+  else:
+    cut = floor( ndH/2 )
+    img = image[(cut+1):imgH-cut, :]
 
-  counts = np.bincount(hs)
-  hw = np.argmax(counts)
+  if ndW % 2 == 0:
+    cut = ndW /2
+    img = img[:, cut:imgW-cut]
+  else:
+    cut = floor( ndW/2 )
+    img = img[:, (cut+1):imgW-cut]
 
-  counts = np.bincount(ss)
-  sw = np.argmax(counts)
+  # Convert to HSV
+  img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-  counts = np.bincount(vs)
-  vw = np.argmax(counts)
+  # initialise matrix
+  resultsHolder = np.zeros([3, img.shape[0], img.shape[1]])
 
-  return (int(hw), int(sw), int(vw))
+  # Analyse quadrants
+  for heigh in np.range(0, img.shape[0], region):
+    for width in np.range(0, img.shape[1], region):
+
+      h = hsv[heigh:heigh+region-1, width:width+region-1, 0]
+      s = hsv[heigh:heigh+region-1, width:width+region-1, 1]
+      v = hsv[heigh:heigh+region-1, width:width+region-1, 2]
+
+      hs = list(itertools.chain.from_iterable(h.tolist()))
+      ss = list(itertools.chain.from_iterable(s.tolist()))
+      vs = list(itertools.chain.from_iterable(v.tolist()))
+
+      counts = np.bincount(hs)
+      hresultsHolder[0, heigh/2, width/2] = np.argmax(counts)
+
+      counts = np.bincount(ss)
+      resultsHolder[1, heigh/2, width/2] = np.argmax(counts)
+
+      counts = np.bincount(vs)
+      resultsHolder[2, heigh/2, width/2] = np.argmax(counts)
+
+  return resultsHolder
 
 # Constants
 blob_container = 'imagecontainer'
+blob_analysis = 'analysis'
 imagesQueue = 'imagesqueue'
 
 tableName = 'photos'
@@ -57,6 +89,7 @@ with open ("ASK.key", "r") as myfile:
 # Create blob service
 blob_service = BlobService( account_name=accountName, account_key=accountKey )
 blob_service.create_container( blob_container )
+blob_service.create_container( blob_analysis )
 
 # Open queue with given credentials
 queue_service = QueueService( account_name=accountName, account_key=accountKey )
@@ -64,36 +97,50 @@ queue_service = QueueService( account_name=accountName, account_key=accountKey )
 # Open table service
 table_service = TableService( account_name=accountName, account_key=accountKey )
 
+# Analysis results
+results = None
+# Regions for analysis
+region = 4
+
 # Repeat
 while(True):
 
   # get images form *imagesQueue* - it is invoked by CRON
   messages = queue_service.get_messages( imagesQueue )
+  if len(messages) == 0:
+    sleep(15)
   for message in messages:
     # get image: image ID
     imgBlobName = b64decode( message.message_text )
     print( imgBlobName )
     tableRowKey = imgBlobName
-    blob = blob_service.get_blob(blob_container, imgBlobName)
+
+    try:
+      blob = blob_service.get_blob(blob_container, imgBlobName)
+    except azure.WindowsAzureMissingResourceError:
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      continue
+
     image = blobToOpenCV(blob)
     # process image
-    (hw, sw, vw) = getCharacteristics( image )
+    colourStructure = getCharacteristics( image, region, results )
+
+    put_block_blob_form_bytes( blob_analysis, imgBlobName, dump(colourStructure) )
 
     # {'PartitionKey': 'allPhotos', 'RowKey': 'imageName', 'thumbnail' : 'thumbnailName',
     #  'userId' : ?, 'local' : ?, 'hue' : 200, 'saturation' : 200, 'value' : 200}
     ## query for image in table to ensure existence
     currentTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
+
+    
   
     ## send the quantities to table: save thumbnail ID & save image characteristics
     # currentTask.thumbnail = tnID
-    currentTask.hue = hw
-    currentTask.saturation = sw
-    currentTask.value = vw
+    currentTask.analysed = True
     table_service.update_entity( tableName, tablePartitionKey, tableRowKey, currentTask)
 
     # dequeue image
     queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
-    sleep(15)
 
 
 
