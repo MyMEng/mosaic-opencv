@@ -25,15 +25,26 @@ def getImgURL( imgURL ):
 
 # Make thumbnails of uploaded images
 def makeThumbnail( image, width ) :
-  ## TODO: should I ask whether to do different sizes
-  ## TODO: check whether correct aspect ratio
+  ## Normalise to square based on lower dimension
+  imgH = image.shape[0]
+  imgW = image.shape[1]
+
+  if imgH < imgW:
+    cut = (imgW-imgH)/2
+    crop_img = image[:, cut:imgW-cut]
+  elif imgH > imgW:
+    cut = (imgH-imgW)/2
+    crop_img = image[cut:imgH-cut, :]
+  elif imgH==imgW:
+    # Nothing to do
+    crop_img = image
 
   # we need to keep in mind aspect ratio
-  r = (width * 1.0) / image.shape[1]
-  dim = ( width, int(image.shape[0] * r) )
+  r = (width * 1.0) / crop_img.shape[1]
+  dim = ( width, int(crop_img.shape[0] * r) )
    
   # perform the actual resizing of the image
-  res = cv2.resize(image, dim, interpolation = cv2.INTER_AREA) # None, fx=2, fy=2
+  res = cv2.resize(crop_img, dim, interpolation = cv2.INTER_AREA) # None, fx=2, fy=2
   return res
 
 # Analyse the overall colour of image
@@ -60,8 +71,8 @@ def getCharacteristics( image ):
 
   return (int(hw), int(sw), int(vw))
 
-blob_container = 'imagecontainer'
-imagesQueue = 'imagesqueue'
+blob_container = 'smallimages'
+imagesQueue = 'smallimagesqueue'
 imageWidth = 100
 
 tableName = 'photos'
@@ -104,11 +115,12 @@ while(True):
     # put thumbnail to bloob: add suffix _tn
     result ,blob_tn = cv2.imencode( '.jpg', image_tn )
 
-
-    if imgBlobName[-4] == '.'  :
-      tnID = imgBlobName[:-4] + "_tn" + imgBlobName[-4:]
-    else :
-      tnID = imgBlobName[:-5] + "_tn" + imgBlobName[-5:]
+    # Override
+    tnID = imgBlobName
+    # if imgBlobName[-4] == '.'  :
+      # tnID = imgBlobName[:-4] + "_tn" + imgBlobName[-4:]
+    # else :
+      # tnID = imgBlobName[:-5] + "_tn" + imgBlobName[-5:]
 
 
     blob_service.put_block_blob_from_bytes( blob_container, tnID, str(bytearray(blob_tn.flatten().tolist())) )
@@ -120,7 +132,7 @@ while(True):
   
 
     ## send the quantities to table: save thumbnail ID & save image characteristics
-    currentTask.thumbnail = tnID
+    # currentTask.thumbnail = tnID
     currentTask.hue = hw
     currentTask.saturation = sw
     currentTask.value = vw
