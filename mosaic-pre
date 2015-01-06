@@ -11,7 +11,7 @@
 
 dir="/home/mosaic/mosaic-opencv"
 user="mosaic"
-cmd="python preprocess.cv.py"
+cmd="python preprocess.cv.py; python analyse.cv.py"
 
 name=`basename $0`
 pid_file="/var/run/$name.pid"
