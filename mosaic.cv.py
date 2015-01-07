@@ -14,12 +14,24 @@ from math import ceil, floor
 from pickle import load
 
 def blobToOpenCV(blob):
-    arr = np.asarray(bytearray(blob), dtype=np.uint8)
-    img = cv2.imdecode(arr, -1)
-    return img
+  arr = np.asarray(bytearray(blob), dtype=np.uint8)
+  img = cv2.imdecode(arr, -1)
+  return img
 
 def blobToArray(blob):
-    return load(blob)
+  return load(blob)
+
+# Identify most appropriate miniature
+def chooseSimilar( regionChar, minises ):
+  # First try by hue
+  hOrg = regionChar[0]
+  res = []
+  for i, mini in enumerate(minises):
+    res.append( ( np.abs(mini[1][0] - hOrg), i) )
+  sort = sorted( res, key=lambda tup:tup[0] )
+  returnVal = choice( sort[0:3] )
+  # index = np.argmin( (res, i) )
+  return minises[returnVal[1]][0]
 
 
 blob_small = 'smallimages'
@@ -76,9 +88,9 @@ while(True):
       continue
 
     # Check if all miniatures are ready
-    tasks = table_service.query_entities(tableName, "PartitionKey eq '"+tablePartitionKey+"' and parent eq '" +imgBlobName + "'" )
+    imgChildren = table_service.query_entities(tableName, "PartitionKey eq '"+tablePartitionKey+"' and parent eq '" +imgBlobName + "'" )
     miniturisation = True
-    for task in tasks:
+    for task in imgChildren:
       if hasattr(task, 'hue') and hasattr(task, 'saturation') and hasattr(task, 'value'):
         if task.hue == -1 or task.saturation == -1 or task.value == -1:
           # continue to next message
@@ -96,11 +108,73 @@ while(True):
         # continue to next message
         continue
 
+    # Get big image analysis
+    try:
+      blobAnalysis = blob_service.get_blob(blob_analysis, imgBlobName)
+    except azure.WindowsAzureMissingResourceError:
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      continue
+    bigImageAnalysis = blobToArray( blobAnalysis )
 
 
-    # Get analysed data from blob
-    # Start putting together minis
-    print "Mosaic making"
+    # Get big image
+    try:
+      blobBigImage = blob_service.get_blob(blob_big, imgBlobName)
+    except azure.WindowsAzureMissingResourceError:
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      continue
+    bigImage = blobToOpenCV(blobBigImage)
+    # Resize big image
+    bigImageBigger = cv2.resize(img, (w,h), interpolation = cv2.INTER_AREA)
+
+
+    # Get miniatures for mosaic making
+    minises = []
+    for child in imgChildren:
+      miniName = child.RowKey
+      try:
+        blobMini = blob_service.get_blob(blob_small, miniName)
+      except azure.WindowsAzureMissingResourceError:
+        queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+        continue
+      imgMini = blobToOpenCV(blobMini)
+      imgMiniHSV = cv2.cvtColor(imgMini, cv2.COLOR_BGR2HSV)
+      minises.append( (imgMiniHSV, (child.hue, child.saturation, child.value)) )
+
+
+    # Get parameters
+    factor = imageWidth = 100 # preprocess.cv.py
+    h = factor * bigImageAnalysis.shape[1]
+    w = factor * bigImageAnalysis.shape[2]
+
+    # Initialise output image
+    resultImage = np.zeros( (h, w, 3 ), np.uint8 )
+
+
+    for hi in np.arange(0, h, factor):
+      for wi in np.arange(0, w, factor):
+        hue = analysed[0, hi/factor, wi/factor]
+        sat = analysed[1, hi/factor, wi/factor]
+        val = analysed[2, hi/factor, wi/factor]
+        resultImage[hi:hi+factor, wi:wi+factor, :] = chooseSimilar( (hue, sat, val), minises )
+        resultImage[hi:hi+factor, wi:wi+factor, 2] = val
+
+    # Change colour
+    compiledImage = cv2.cvtColor(resultImage, cv2.COLOR_HSV2BGR)
+    # Overlay
+    saveImage = cv2.addWeighted( compiledImage, 0.4, bigImageBigger, 0.6, 1 )
+
+    # Put to blob
+    if imgBlobName[-4] == '.'  :
+      mosID = imgBlobName[:-4] + "_mos" + imgBlobName[-4:]
+    else :
+      mosID = imgBlobName[:-5] + "_mos" + imgBlobName[-5:]
+    ignore ,blobImage = cv2.imencode( '.jpg', saveImage )
+    blob_service.put_block_blob_from_bytes( blob_big, mosID, str(bytearray(blobImage.flatten().tolist())) )
+
+    # Find big image entity
+    currentTableTask.mosaicId = mosID
+    table_service.update_entity( tableName, tablePartitionKey, tableRowKey, currentTableTask)
 
     # dequeue image
     queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )

@@ -24,25 +24,35 @@ def getImgURL( imgURL ):
   img = cv2.imdecode(arr, -1) # 'load it as it is'
   return img
 
-# Make thumbnails of uploaded images
 def makeThumbnail( image, width ) :
   ## Normalise to square based on lower dimension
   imgH = image.shape[0]
   imgW = image.shape[1]
 
   if imgH < imgW:
-    cut = (imgW-imgH)/2
-    crop_img = image[:, cut:imgW-cut]
+    diff = imgW-imgH
+    if diff%2 == 0:
+      cut = (diff)/2
+      crop_img = image[:, cut:imgW-cut]
+    else:
+      cut = (diff)/2.0
+      cut = floor(cut)
+      crop_img = image[:, cut+1:imgW-cut]
   elif imgH > imgW:
-    cut = (imgH-imgW)/2
-    crop_img = image[cut:imgH-cut, :]
+    diff = imgH-imgW
+    if diff%2 == 0:
+      cut = (diff)/2
+      crop_img = image[cut:imgH-cut, :]
+    else:
+      cut = (diff)/2
+      cut = floor(cut)
+      crop_img = image[cut+1:imgH-cut, :]
   elif imgH==imgW:
     # Nothing to do
     crop_img = image
 
   # we need to keep in mind aspect ratio
-  r = (width * 1.0) / crop_img.shape[1]
-  dim = ( width, int(crop_img.shape[0] * r) )
+  dim = ( width, width )
    
   # perform the actual resizing of the image
   res = cv2.resize(crop_img, dim, interpolation = cv2.INTER_AREA) # None, fx=2, fy=2

@@ -45,28 +45,28 @@ def getCharacteristics( image, region, resultsHolder ):
   img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
   # initialise matrix
-  resultsHolder = np.zeros([3, img.shape[0], img.shape[1]])
+  resultsHolder = np.zeros([3, img.shape[0]/region, img.shape[1]/region])
 
   # Analyse quadrants
   for heigh in np.arange(0, img.shape[0], region):
     for width in np.arange(0, img.shape[1], region):
 
-      h = img[heigh:heigh+region-1, width:width+region-1, 0]
-      s = img[heigh:heigh+region-1, width:width+region-1, 1]
-      v = img[heigh:heigh+region-1, width:width+region-1, 2]
+      h = img[heigh:heigh+region, width:width+region, 0]
+      s = img[heigh:heigh+region, width:width+region, 1]
+      v = img[heigh:heigh+region, width:width+region, 2]
 
       hs = list(itertools.chain.from_iterable(h.tolist()))
       ss = list(itertools.chain.from_iterable(s.tolist()))
       vs = list(itertools.chain.from_iterable(v.tolist()))
 
       counts = np.bincount(hs)
-      resultsHolder[0, heigh/2, width/2] = np.argmax(counts)
+      resultsHolder[0, heigh/region, width/region] = np.argmax(counts)
 
       counts = np.bincount(ss)
-      resultsHolder[1, heigh/2, width/2] = np.argmax(counts)
+      resultsHolder[1, heigh/region, width/region] = np.argmax(counts)
 
       counts = np.bincount(vs)
-      resultsHolder[2, heigh/2, width/2] = np.argmax(counts)
+      resultsHolder[2, heigh/region, width/region] = np.argmax(counts)
 
   return resultsHolder
 
