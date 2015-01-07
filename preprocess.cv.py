@@ -11,6 +11,7 @@ import urllib
 from base64 import b64decode
 import itertools
 from time import sleep
+from math import floor
 
 def blobToOpenCV(blob):
     arr = np.asarray(bytearray(blob), dtype=np.uint8)
@@ -84,7 +85,7 @@ def getCharacteristics( image ):
 
 blob_container = 'smallimages'
 imagesQueue = 'smallimagesqueue'
-imageWidth = 100
+imageWidth = 25
 
 tableName = 'photos'
 tablePartitionKey = 'allphotos'

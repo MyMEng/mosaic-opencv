@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import cv
+import azure
 
 from azure.storage import QueueService
 from azure.storage import BlobService
@@ -11,7 +12,8 @@ from base64 import b64decode
 import itertools
 from time import sleep
 from math import ceil, floor
-from pickle import load
+from pickle import loads
+from random import choice
 
 def blobToOpenCV(blob):
   arr = np.asarray(bytearray(blob), dtype=np.uint8)
@@ -19,7 +21,7 @@ def blobToOpenCV(blob):
   return img
 
 def blobToArray(blob):
-  return load(blob)
+  return loads(bytearray(blob))
 
 # Identify most appropriate miniature
 def chooseSimilar( regionChar, minises ):
@@ -77,7 +79,12 @@ while(True):
     tableRowKey = imgBlobName
 
     # Check if analysis completed: if not continue to next message
-    currentTableTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
+    try:
+        currentTableTask = table_service.get_entity( tableName, tablePartitionKey, tableRowKey)
+    except azure.WindowsAzureMissingResourceError:
+        queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+        continue
+
     if hasattr(currentTableTask, 'analysed'):
       if currentTableTask.analysed:
         # Do nothing analysis completed
@@ -116,7 +123,6 @@ while(True):
       continue
     bigImageAnalysis = blobToArray( blobAnalysis )
 
-
     # Get big image
     try:
       blobBigImage = blob_service.get_blob(blob_big, imgBlobName)
@@ -125,8 +131,13 @@ while(True):
       continue
     bigImage = blobToOpenCV(blobBigImage)
     # Resize big image
-    bigImageBigger = cv2.resize(img, (w,h), interpolation = cv2.INTER_AREA)
 
+    # Get parameters
+    factor = imageWidth = 25 # preprocess.cv.py
+    h = factor * bigImageAnalysis.shape[1]
+    w = factor * bigImageAnalysis.shape[2]
+
+    bigImageBigger = cv2.resize(bigImage, (w,h), interpolation = cv2.INTER_AREA)
 
     # Get miniatures for mosaic making
     minises = []
@@ -141,28 +152,27 @@ while(True):
       imgMiniHSV = cv2.cvtColor(imgMini, cv2.COLOR_BGR2HSV)
       minises.append( (imgMiniHSV, (child.hue, child.saturation, child.value)) )
 
-
-    # Get parameters
-    factor = imageWidth = 100 # preprocess.cv.py
-    h = factor * bigImageAnalysis.shape[1]
-    w = factor * bigImageAnalysis.shape[2]
-
     # Initialise output image
     resultImage = np.zeros( (h, w, 3 ), np.uint8 )
 
 
     for hi in np.arange(0, h, factor):
       for wi in np.arange(0, w, factor):
-        hue = analysed[0, hi/factor, wi/factor]
-        sat = analysed[1, hi/factor, wi/factor]
-        val = analysed[2, hi/factor, wi/factor]
+        hue = bigImageAnalysis[0, hi/factor, wi/factor]
+        sat = bigImageAnalysis[1, hi/factor, wi/factor]
+        val = bigImageAnalysis[2, hi/factor, wi/factor]
         resultImage[hi:hi+factor, wi:wi+factor, :] = chooseSimilar( (hue, sat, val), minises )
         resultImage[hi:hi+factor, wi:wi+factor, 2] = val
 
     # Change colour
     compiledImage = cv2.cvtColor(resultImage, cv2.COLOR_HSV2BGR)
     # Overlay
-    saveImage = cv2.addWeighted( compiledImage, 0.4, bigImageBigger, 0.6, 1 )
+    try:
+        saveImage = cv2.addWeighted( compiledImage, 0.4, bigImageBigger, 0.6, 1 )
+    except cv2.error as ex:
+        queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+        sys.stderr.write(ex)
+        continue
 
     # Put to blob
     if imgBlobName[-4] == '.'  :
