@@ -124,7 +124,7 @@ while(True):
     try:
       blob = blob_service.get_blob(blob_container, imgBlobName)
     except azure.WindowsAzureMissingResourceError:
-      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      #queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
       continue
 
 
