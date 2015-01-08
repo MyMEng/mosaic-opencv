@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import cv
+import azure
 
 from azure.storage import QueueService
 from azure.storage import BlobService
