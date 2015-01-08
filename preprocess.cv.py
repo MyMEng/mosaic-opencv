@@ -85,7 +85,7 @@ def getCharacteristics( image ):
 
 blob_container = 'smallimages'
 imagesQueue = 'smallimagesqueue'
-imageWidth = 25
+imageWidth = 50
 
 tableName = 'photos'
 tablePartitionKey = 'allphotos'

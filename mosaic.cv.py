@@ -111,9 +111,9 @@ while(True):
         miniturisation = False
         break
 
-      if miniturisation == False:
-        # continue to next message
-        continue
+    if miniturisation == False:
+      # continue to next message
+      continue
 
     # Get big image analysis
     try:
@@ -133,7 +133,7 @@ while(True):
     # Resize big image
 
     # Get parameters
-    factor = imageWidth = 25 # preprocess.cv.py
+    factor = imageWidth = 50 # preprocess.cv.py
     h = factor * bigImageAnalysis.shape[1]
     w = factor * bigImageAnalysis.shape[2]
 
