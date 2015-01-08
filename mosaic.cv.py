@@ -140,9 +140,16 @@ while(True):
     try:
       bigImageBigger = cv2.resize(bigImage, (w,h), interpolation = cv2.INTER_AREA)
     except cv2.error as ex:
-      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
-      sys.stderr.write(ex)
-      continue
+      try:
+        bigImageBigger = cv2.resize(bigImage, (w/5,h/5), interpolation = cv2.INTER_AREA)
+      except cv2.error as ex:
+        queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+        sys.stderr.write(ex)
+        continue
+
+      # queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      # sys.stderr.write(ex)
+      # continue
 
     # Get miniatures for mosaic making
     minises = []
@@ -171,6 +178,11 @@ while(True):
 
     # Change colour
     compiledImage = cv2.cvtColor(resultImage, cv2.COLOR_HSV2BGR)
+
+    # Check whether to resize
+    if bigImageBigger.shape[0:2] == (h/5, w/5): # it didn't fit resize it as well
+      compiledImage = cv2.resize(compiledImage, (w/5,h/5), interpolation = cv2.INTER_AREA)
+
     # Overlay
     try:
         saveImage = cv2.addWeighted( compiledImage, 0.4, bigImageBigger, 0.6, 1 )
