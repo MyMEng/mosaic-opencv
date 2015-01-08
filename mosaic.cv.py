@@ -137,7 +137,12 @@ while(True):
     h = factor * bigImageAnalysis.shape[1]
     w = factor * bigImageAnalysis.shape[2]
 
-    bigImageBigger = cv2.resize(bigImage, (w,h), interpolation = cv2.INTER_AREA)
+    try:
+      bigImageBigger = cv2.resize(bigImage, (w,h), interpolation = cv2.INTER_AREA)
+    except cv2.error as ex:
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      sys.stderr.write(ex)
+      continue
 
     # Get miniatures for mosaic making
     minises = []
