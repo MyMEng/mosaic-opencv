@@ -123,6 +123,27 @@ while(True):
       continue
 
     image = blobToOpenCV(blob)
+
+
+    # ADDED ####################################################################
+    ## Decrease main image size
+    # we need to keep in mind aspect ratio
+    if image.shape[1] >= image.shape[0]:
+      width = 800
+      r = (width * 1.0) / image.shape[1]
+      dim = ( width, int(image.shape[0] * r) )
+    else:
+      height = 800
+      r = (height * 1.0) / image.shape[0]
+      dim = ( int(image.shape[1] * r), height )
+    # perform the actual resizing of the image
+    image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+    # put to blob smaller version
+    lol ,image_tn = cv2.imencode( '.jpg', image )
+    blob_service.put_block_blob_from_bytes( blob_container, imgBlobName, str(bytearray(image_tn.flatten().tolist())) )
+    ############################################################################
+
+
     # process image
     colourStructure = getCharacteristics( image, region, results )
 
