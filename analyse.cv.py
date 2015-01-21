@@ -124,6 +124,14 @@ while(True):
 
     image = blobToOpenCV(blob)
 
+    # ADDED#2 ########################################
+    if image is None:
+      print "GIF attempt in analyse"
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      blob_service.delete_blob( blob_container, imgBlobName)
+      table_service.delete_entity( tableName, tablePartitionKey, tableRowKey)
+      continue
+
 
     # ADDED ####################################################################
     ## Decrease main image size

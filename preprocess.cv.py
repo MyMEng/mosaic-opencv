@@ -129,6 +129,17 @@ while(True):
 
 
     image = blobToOpenCV(blob) # image = getImgURL( imgURL )
+
+
+    # ADDED2 #####
+    if image is None:
+      print "GIF attempt in pre-process"
+      queue_service.delete_message( imagesQueue, message.message_id, message.pop_receipt )
+      table_service.delete_entity( tableName, tablePartitionKey, tableRowKey)
+      blob_service.delete_blob( blob_container, imgBlobName)
+      continue
+
+
     # process image
     image_tn = makeThumbnail( image, imageWidth )
     (hw, sw, vw) = getCharacteristics( image )
